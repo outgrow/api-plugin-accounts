@@ -52,7 +52,7 @@ export default async function inviteShopMember(context, input) {
     }
   }).toArray();
 
-  if (!groups) {
+  if (groups.length === 0) {
     throw new ReactionError("not-found", "No groups matching the provided IDs were found");
   }
 
@@ -85,9 +85,7 @@ export default async function inviteShopMember(context, input) {
 
   // This check is part of `updateGroupsForAccounts` mutation for existing users. For new users,
   // we do it here before creating an invite record and sending the invite email.
-  for (let groupShopId of groupShopIds) {
-    await context.validatePermissions("reaction:legacy:groups", "manage:accounts", { groupShopId });
-  }
+  await Promise.all(groupShopIds.map((groupShopId) => context.validatePermissions("reaction:legacy:groups", "manage:accounts", { shopId: groupShopId })));
 
   // Create an AccountInvites document. If a person eventually creates an account with this email address,
   // it will be automatically added to this group instead of the default group for this shop.
@@ -129,7 +127,8 @@ export default async function inviteShopMember(context, input) {
   const dataForEmail = {
     contactEmail: _.get(shop, "emails[0].address"),
     copyrightDate: new Date().getFullYear(),
-    groupNames: formattedGroupNames,
+    groupName: _.startCase(groups[0].name),
+    groupNames: groups.map((group) => group.name),
     hasMultipleGroups: groups.length > 1,
     legalName: _.get(shop, "addressBook[0].company"),
     physicalAddress: {
